@@ -1,0 +1,8 @@
+erts
+kernel
+stdlib
+deps/poolboy/ebin
+deps/erlcql/ebin
+deps/snappy/ebin
+deps/lz4/ebin
+deps/uuid/ebin

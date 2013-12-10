@@ -1,0 +1,11 @@
+%% -*- mode: erlang -*-
+%% vi: set ft=erlang :
+
+{application, erlcql_poolboy,
+ [{description, "Pool of erlcql connections"},
+  {vsn, "0.1.0"},
+  {applications,
+   [kernel,
+    stdlib,
+    poolboy,
+    erlcql]}]}.
