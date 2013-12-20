@@ -46,6 +46,7 @@ q(PoolName, Query) ->
 
 -spec q(atom(), iodata(), erlcql:consistency()) -> erlcql:reponse().
 q(PoolName, Query, Consistency) ->
-    poolboy:transaction(PoolName, fun(Worker) ->
-        erlcql:q(Worker, Query, Consistency)
-    end).
+    Worker = poolboy:checkout(PoolName),
+    {ok, QueryRef} = erlcql_client:async_query(Worker, Query, Consistency),
+    ok = poolboy:checkin(PoolName, Worker),
+    erlcql_client:await(QueryRef).
