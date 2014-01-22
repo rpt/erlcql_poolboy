@@ -40,11 +40,11 @@ start_link(Name, SizeOpts, WorkerOpts) ->
                 {worker_module, erlcql_client}],
     poolboy:start_link(PoolOpts ++ SizeOpts, WorkerOpts).
 
--spec q(atom(), iodata()) -> erlcql:reponse().
+-spec q(atom(), iodata()) -> erlcql:response().
 q(PoolName, Query) ->
     q(PoolName, Query, any).
 
--spec q(atom(), iodata(), erlcql:consistency()) -> erlcql:reponse().
+-spec q(atom(), iodata(), erlcql:consistency()) -> erlcql:response().
 q(PoolName, Query, Consistency) ->
     Worker = poolboy:checkout(PoolName),
     {ok, QueryRef} = erlcql_client:async_query(Worker, Query, Consistency),
