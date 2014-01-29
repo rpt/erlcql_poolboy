@@ -25,8 +25,9 @@
 
 -export([start_link/2,
          start_link/3]).
--export([q/2,
-         q/3]).
+-export([q/2, 'query'/2, q/3, 'query'/3,
+         e/3, execute/3, e/4, execute/4,
+         p/3, prepare/3]).
 
 -spec start_link(atom(), proplists:proplist()) ->
           {ok, pid()} | {error, term()}.
@@ -36,17 +37,81 @@ start_link(Name, SizeOpts) ->
 -spec start_link(atom(), proplists:proplist(), proplists:proplist()) ->
           {ok, pid()} | {error, term()}.
 start_link(Name, SizeOpts, WorkerOpts) ->
+    Tid = ets:new(erlcql_poolboy_prepared, [set, public,
+                                            {read_concurrency, true}]),
+    Key = prepared_statements_ets_tid,
+    WorkerOpts2 = lists:keystore(Key, 1, WorkerOpts, {Key, Tid}),
+
     PoolOpts = [{name, {local, Name}},
                 {worker_module, erlcql_client}],
-    poolboy:start_link(PoolOpts ++ SizeOpts, WorkerOpts).
+    poolboy:start_link(PoolOpts ++ SizeOpts, WorkerOpts2).
 
--spec q(atom(), iodata()) -> erlcql:response().
 q(PoolName, Query) ->
-    q(PoolName, Query, any).
+    q(PoolName, Query, erlcql:default(consistency)).
 
--spec q(atom(), iodata(), erlcql:consistency()) -> erlcql:response().
+-spec 'query'(atom(), iodata()) -> erlcql:response().
+'query'(PoolName, Query) ->
+    'query'(PoolName, Query, erlcql:default(consistency)).
+
 q(PoolName, Query, Consistency) ->
+    'query'(PoolName, Query, Consistency).
+
+-spec 'query'(atom(), iodata(), erlcql:consistency()) -> erlcql:response().
+'query'(PoolName, Query, Consistency) ->
+    Fun = fun(Worker) ->
+                  erlcql_client:async_query(Worker, Query, Consistency)
+          end,
+    poolboy_call(PoolName, Fun).
+
+p(PoolName, Query, Name) ->
+    prepare(PoolName, Query, Name).
+
+-spec prepare(atom(), iodata(), atom()) -> erlcql:response().
+prepare(PoolName, Query, Name) ->
+    {_, N, _, _} = poolboy:status(PoolName),
+    First = poolboy:checkout(PoolName),
+    case erlcql_client:prepare(First, Query, Name) of
+        {ok, QueryId} ->
+            Rest = [poolboy:checkout(PoolName) || _ <- lists:seq(1, N - 1)],
+            ok = poolboy:checkin(PoolName, First),
+            _ = [prepare_rest(PoolName, Worker, Query, QueryId) || Worker <- Rest],
+            {ok, QueryId};
+        {error, _Reason} = Error ->
+            Error
+    end.
+
+-spec prepare_rest(atom(), pid(), iodata(), erlcql:uuid()) -> ok.
+prepare_rest(PoolName, Worker, Query, QueryId) ->
+    {ok, QueryId} = erlcql_client:prepare(Worker, Query),
+    ok = poolboy:checkin(PoolName, Worker).
+
+e(PoolName, QueryId, Values) ->
+    execute(PoolName, QueryId, Values, erlcql:default(consistency)).
+
+-spec execute(atom(), erlcql:uuid() | atom(), [binary()]) -> erlcql:response().
+execute(PoolName, QueryId, Values) ->
+    execute(PoolName, QueryId, Values, erlcql:default(consistency)).
+
+e(PoolName, QueryId, Values, Consistency) ->
+    execute(PoolName, QueryId, Values, Consistency).
+
+-spec execute(atom(), erlcql:uuid() | atom(),
+              [binary()], erlcql:consistency()) -> erlcql:response().
+execute(PoolName, QueryId, Values, Consistency) ->
+    Fun = fun(Worker) ->
+                  erlcql_client:async_execute(Worker, QueryId,
+                                              Values, Consistency)
+          end,
+    poolboy_call(PoolName, Fun).
+
+-spec poolboy_call(atom(), fun((pid()) -> erlcql:response())) -> erlcql:response().
+poolboy_call(PoolName, Fun) ->
     Worker = poolboy:checkout(PoolName),
-    {ok, QueryRef} = erlcql_client:async_query(Worker, Query, Consistency),
+    Res = Fun(Worker),
     ok = poolboy:checkin(PoolName, Worker),
-    erlcql_client:await(QueryRef).
+    case Res of
+        {ok, QueryRef} ->
+            erlcql_client:await(QueryRef);
+        {error, _Reason} = Error ->
+            Error
+    end.

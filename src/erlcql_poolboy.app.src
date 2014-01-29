@@ -3,7 +3,7 @@
 
 {application, erlcql_poolboy,
  [{description, "Pool of erlcql connections"},
-  {vsn, "0.1.1"},
+  {vsn, "0.1.2"},
   {applications,
    [kernel,
     stdlib,
