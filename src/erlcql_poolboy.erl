@@ -29,6 +29,8 @@
          e/3, execute/3, e/4, execute/4,
          p/3, prepare/3]).
 
+-type values() :: erlcql:values().
+
 -spec start_link(atom(), proplists:proplist()) ->
           {ok, pid()} | {error, term()}.
 start_link(Name, SizeOpts) ->
@@ -88,7 +90,7 @@ prepare_rest(PoolName, Worker, Query, QueryId) ->
 e(PoolName, QueryId, Values) ->
     execute(PoolName, QueryId, Values, erlcql:default(consistency)).
 
--spec execute(atom(), erlcql:uuid() | atom(), [binary()]) -> erlcql:response().
+-spec execute(atom(), erlcql:uuid() | atom(), values()) -> erlcql:response().
 execute(PoolName, QueryId, Values) ->
     execute(PoolName, QueryId, Values, erlcql:default(consistency)).
 
@@ -96,7 +98,7 @@ e(PoolName, QueryId, Values, Consistency) ->
     execute(PoolName, QueryId, Values, Consistency).
 
 -spec execute(atom(), erlcql:uuid() | atom(),
-              [binary()], erlcql:consistency()) -> erlcql:response().
+              values(), erlcql:consistency()) -> erlcql:response().
 execute(PoolName, QueryId, Values, Consistency) ->
     Fun = fun(Worker) ->
                   erlcql_client:async_execute(Worker, QueryId,
