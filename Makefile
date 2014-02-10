@@ -1,7 +1,8 @@
-.PHONY: all deps compile dialyze clean
+.PHONY: all deps compile dialyze wait test clean
 
 APPS = dialyzer.apps
 PLT = apps.plt
+TIMEOUT = 15
 
 all: deps compile
 
@@ -23,6 +24,12 @@ $(PLT): dialyzer.apps
 	@- dialyzer -q --build_plt --output_plt $(PLT) \
 	   --apps $(shell cat $(APPS))
 	@ echo " done"
+
+wait:
+	@ ./wait $(TIMEOUT) || (echo "Cassandra down"; exit 1)
+
+test: compile wait
+	@ rebar skip_deps=true ct
 
 clean:
 	@ rebar clean
