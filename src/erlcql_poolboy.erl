@@ -84,7 +84,7 @@ prepare(PoolName, Query, Name) ->
 
 -spec prepare_rest(atom(), pid(), iodata(), erlcql:uuid()) -> ok.
 prepare_rest(PoolName, Worker, Query, QueryId) ->
-    {ok, QueryId} = erlcql_client:prepare(Worker, Query),
+    {ok, QueryId, _} = erlcql_client:prepare(Worker, Query),
     ok = poolboy:checkin(PoolName, Worker).
 
 e(PoolName, QueryId, Values) ->
